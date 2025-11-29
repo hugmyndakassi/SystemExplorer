@@ -358,7 +358,7 @@
       <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
     </Manifest>
     <PostBuildEvent>
-      <Command>signtool sign /i DigiCert /fd sha256 $(TargetPath)</Command>
+      <Command>signtool sign /a /n Scorpio /t http://timestamp.digicert.com /fd sha256 $(TargetPath)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -630,6 +630,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\x64\ReleaseSigned\KObjExp.sys" />
+    <None Include="..\x64\Release\KObjExp.sys" />
     <None Include="Bin\x64\KObjExp.sys" />
     <None Include="packages.config" />
   </ItemGroup>

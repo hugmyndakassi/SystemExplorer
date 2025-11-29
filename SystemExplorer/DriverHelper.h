@@ -17,6 +17,6 @@ struct DriverHelper abstract final {
 private:
 	static bool OpenDevice();
 
-	static HANDLE _hDevice;
+	inline static HANDLE _hDevice;
 };
 

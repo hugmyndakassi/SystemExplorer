@@ -4,8 +4,6 @@
 #include "SecurityHelper.h"
 #include "..\KObjExp\KObjExp.h"
 
-HANDLE DriverHelper::_hDevice;
-
 bool DriverHelper::LoadDriver(bool load) {
 	if (_hDevice) {
 		::CloseHandle(_hDevice);

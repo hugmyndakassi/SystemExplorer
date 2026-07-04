@@ -11,6 +11,7 @@
 #include "ListViewHelper.h"
 #include "ClipboardHelper.h"
 #include "ImageIconCache.h"
+#include "ListViewColorHelper.h"
 #include <ProcessInfo.h>
 #include "IListView.h"
 
@@ -117,6 +118,8 @@ DWORD CProcessesView::OnItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 		auto& p = m_Processes[index];
 		auto& px = GetProcessInfoEx(p.get());
 		GetProcessColors(px, lcd->clrTextBk, lcd->clrText);
+		if (lcd->clrText == CLR_INVALID)
+			lcd->clrText = lcd->clrTextBk == CLR_INVALID ? GetDefaultTextColor() : GetContrastingTextColor(lcd->clrTextBk);
 
 		return CDRF_NOTIFYSUBITEMDRAW;
 	}
@@ -150,6 +153,8 @@ DWORD CProcessesView::OnSubItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 		GetProcessColors(px, lcd->clrTextBk, lcd->clrText);
 		m_LastTimeCPU = false;
 	}
+	if (lcd->clrText == CLR_INVALID)
+		lcd->clrText = lcd->clrTextBk == CLR_INVALID ? GetDefaultTextColor() : GetContrastingTextColor(lcd->clrTextBk);
 	return CDRF_SKIPPOSTPAINT | CDRF_NEWFONT;
 }
 

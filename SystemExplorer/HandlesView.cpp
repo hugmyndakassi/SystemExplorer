@@ -14,6 +14,7 @@
 #include "SecurityHelper.h"
 #include "UndocListView.h"
 #include "ProcessHelper.h"
+#include "ListViewColorHelper.h"
 
 using namespace WinSys;
 
@@ -458,6 +459,7 @@ DWORD CHandlesView::OnSubItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 			break;
 		}
 	}
+	lcd->clrText = lcd->clrTextBk == CLR_INVALID ? GetDefaultTextColor() : GetContrastingTextColor(lcd->clrTextBk);
 
 	return CDRF_DODEFAULT;
 }

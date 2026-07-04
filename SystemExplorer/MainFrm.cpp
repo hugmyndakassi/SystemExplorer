@@ -34,6 +34,7 @@
 #include "ProcessTreeView.h"
 #include <ProcessInfo.h>
 #include <Helpers.h>
+#include <WTLHelper.h>
 
 const UINT WINDOW_MENU_POSITION = 9;
 
@@ -83,6 +84,13 @@ void CMainFrame::LoadSettings(PCWSTR filename) {
 		filename = path;
 	}
 	Settings::Get().Load(filename);
+}
+
+CString CMainFrame::GetDefaultSettingsFile() {
+	WCHAR path[MAX_PATH];
+	::SHGetFolderPath(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, path);
+	::StringCchCat(path, _countof(path), L"\\SystemExplorer.ini");
+	return path;
 }
 
 void CMainFrame::OnTrayIconSelected() {
@@ -214,7 +222,7 @@ LRESULT CMainFrame::OnTabContextMenu(int, LPNMHDR hdr, BOOL&) {
 	auto tab = static_cast<int>(hdr->idFrom);
 	POINT pt;
 	::GetCursorPos(&pt);
-	auto cmd = (UINT)m_CmdBar.TrackPopupMenu(menu.GetSubMenu(1), TPM_RETURNCMD, pt.x, pt.y);
+	auto cmd = (UINT)::TrackPopupMenu(menu.GetSubMenu(1), TPM_RETURNCMD, pt.x, pt.y, 0, m_hWnd, nullptr);
 	switch (cmd) {
 		case ID_WINDOW_CLOSE:
 			m_view.RemovePage(tab);
@@ -239,7 +247,6 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 		}
 	}
 
-	HWND hWndCmdBar = m_CmdBar.Create(m_hWnd, rcDefault, nullptr, ATL_SIMPLE_CMDBAR_PANE_STYLE);
 	CMenuHandle hMenu = GetMenu();
 	if (SecurityHelper::IsRunningElevated()) {
 		hMenu.GetSubMenu(0).DeleteMenu(ID_FILE_RUNASADMINISTRATOR, MF_BYCOMMAND);
@@ -252,10 +259,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 
 	UIAddMenu(hMenu);
 	UIAddMenu(IDR_CONTEXT);
-	m_CmdBar.AttachMenu(hMenu);
-	SetMenu(nullptr);
-	m_CmdBar.SetAlphaImages(true);
-	InitCommandBar();
+	InitMenu(hMenu);
 
 	CToolBarCtrl tb;
 	auto hWndToolBar = tb.Create(m_hWnd, nullptr, nullptr, ATL_SIMPLE_TOOLBAR_PANE_STYLE | TBSTYLE_LIST, 0, ATL_IDW_TOOLBAR);
@@ -263,7 +267,6 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	InitToolBar(tb);
 
 	CreateSimpleReBar(ATL_SIMPLE_REBAR_NOBORDER_STYLE);
-	AddSimpleReBarBand(hWndCmdBar);
 	AddSimpleReBarBand(hWndToolBar, nullptr, TRUE);
 
 	CReBarCtrl(m_hWndToolBar).LockBands(TRUE);
@@ -285,6 +288,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 
 	UISetCheck(ID_VIEW_TOOLBAR, 1);
 	UISetCheck(ID_VIEW_STATUS_BAR, 1);
+	UISetCheck(ID_OPTIONS_DARKMODE, Settings::Get().DarkMode);
 	UIEnable(ID_OBJECTS_ALLHANDLESFOROBJECT, FALSE);
 	UIEnable(ID_HANDLES_CLOSEHANDLE, FALSE);
 	UIEnable(ID_EDIT_FIND, FALSE);
@@ -296,7 +300,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	pLoop->AddMessageFilter(this);
 	pLoop->AddIdleHandler(this);
 
-	CMenuHandle menuMain = m_CmdBar.GetMenu();
+	CMenuHandle menuMain = GetMenu();
 	m_view.SetWindowMenu(menuMain.GetSubMenu(WINDOW_MENU_POSITION));
 	m_view.SetTitleBarWindow(m_hWnd);
 	
@@ -364,7 +368,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	int index = 0;
 	for (auto& icon : icons) {
 		for (auto& id : icon.id)
-			m_CmdBar.AddIcon(m_TabImages.GetIcon(index), id);
+			WTLHelper::InitMenu(hMenu, MenuItemData{ (int)id, 0, m_TabImages.GetIcon(index) });
 		index++;
 	}
 	m_view.SetImageList(m_TabImages);
@@ -387,7 +391,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 						loaded = DriverHelper::LoadDriver();
 				}
 				if(!loaded) {
-					AtlMessageBox(m_hWnd, L"Failed to install driver. Some functionality will not be available.", IDS_TITLE, MB_ICONERROR);
+					//AtlMessageBox(m_hWnd, L"Failed to install driver. Some functionality will not be available.", IDS_TITLE, MB_ICONERROR);
 				}
 			}
 		}
@@ -597,7 +601,7 @@ LRESULT CMainFrame::OnWindowActivate(WORD /*wNotifyCode*/, WORD wID, HWND /*hWnd
 
 LRESULT CMainFrame::OnShowObjectOfType(WORD, WORD id, HWND, BOOL&) {
 	CString type;
-	m_CmdBar.GetMenu().GetMenuStringW(id, type, 0);
+	CMenuHandle(GetMenu()).GetMenuStringW(id, type, 0);
 	type.Replace(L"&", L"");
 
 	ShowAllObjects(type);
@@ -607,7 +611,7 @@ LRESULT CMainFrame::OnShowObjectOfType(WORD, WORD id, HWND, BOOL&) {
 
 LRESULT CMainFrame::OnShowHandlesOfType(WORD, WORD id, HWND, BOOL&) {
 	CString type;
-	m_CmdBar.GetMenu().GetMenuStringW(id, type, 0);
+	CMenuHandle(GetMenu()).GetMenuStringW(id, type, 0);
 	type.Replace(L"&", L"");
 
 	ShowAllHandles(type);
@@ -812,6 +816,22 @@ LRESULT CMainFrame::OnMinimizeToTray(WORD, WORD, HWND, BOOL&) {
 	return 0;
 }
 
+LRESULT CMainFrame::OnToggleDarkMode(WORD, WORD, HWND, BOOL&) {
+	auto& s = Settings::Get();
+	s.DarkMode = !s.DarkMode;
+	UISetCheck(ID_OPTIONS_DARKMODE, s.DarkMode);
+	PostMessage(WM_UPDATE_DARKMODE);
+
+	return 0;
+}
+
+LRESULT CMainFrame::OnUpdateDarkMode(UINT, WPARAM, LPARAM, BOOL&) {
+	WTLHelper::SwitchToMode(Settings::Get().DarkMode ? DarkModeKind::Dark : DarkModeKind::Light, m_hWnd);
+	SendMessageToDescendants(WM_UPDATE_DARKMODE);
+
+	return 0;
+}
+
 LRESULT CMainFrame::OnViewSystemInformation(WORD, WORD, HWND, BOOL&) {
 	auto pView = new CSysInfoView(this);
 	pView->Create(m_view, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN, 0);
@@ -821,13 +841,6 @@ LRESULT CMainFrame::OnViewSystemInformation(WORD, WORD, HWND, BOOL&) {
 
 LRESULT CMainFrame::OnViewDrivers(WORD, WORD, HWND, BOOL&) {
 	return ShowNotImplemented();
-}
-
-CString CMainFrame::GetDefaultSettingsFile() {
-	WCHAR path[MAX_PATH];
-	::SHGetFolderPath(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, path);
-	::StringCchCat(path, _countof(path), L"\\SystemExplorer.ini");
-	return path;
 }
 
 void CMainFrame::ToggleAlwaysOnTop(UINT id) {
@@ -849,7 +862,7 @@ BOOL CMainFrame::TrackPopupMenu(HMENU hMenu, HWND hWnd, POINT* pt, UINT flags) {
 		pos = *pt;
 	else
 		::GetCursorPos(&pos);
-	return m_CmdBar.TrackPopupMenu(hMenu, flags, pos.x, pos.y);
+	return ::TrackPopupMenu(hMenu, flags, pos.x, pos.y, 0, m_hWnd, nullptr);
 }
 
 HIMAGELIST CMainFrame::GetImageList() {
@@ -861,11 +874,8 @@ int CMainFrame::GetIconIndexByType(PCWSTR type) const {
 	return it == m_IconMap.end() ? 0 : it->second;
 }
 
-void CMainFrame::InitCommandBar() {
-	struct {
-		UINT id, icon;
-		HICON hIcon = nullptr;
-	} cmds[] = {
+void CMainFrame::InitMenu(HMENU hMenu) {
+	MenuItemData cmds[] = {
 		{ ID_PROCESS_COLORS, IDI_COLORWHEEL },
 		{ ID_EDIT_COPY, IDI_COPY },
 		{ ID_OPTIONS_ALWAYSONTOP, IDI_PIN },
@@ -913,9 +923,7 @@ void CMainFrame::InitCommandBar() {
 		{ ID_SYSTEM_PROCESSTREE, IDI_TREE },
 		{ ID_EDIT_PROPERTIES, IDI_PROPERTIES },
 	};
-	for (auto& cmd : cmds) {
-		m_CmdBar.AddIcon(cmd.icon ? AtlLoadIconImage(cmd.icon, 0, 16, 16) : cmd.hIcon, cmd.id);
-	}
+	WTLHelper::InitMenu(hMenu, cmds, _countof(cmds));
 }
 
 #define ID_OBJECTS_OFTYPE 200

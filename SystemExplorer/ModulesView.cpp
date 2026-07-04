@@ -3,6 +3,7 @@
 #include <algorithm>
 #include "SortHelper.h"
 #include "resource.h"
+#include "ListViewColorHelper.h"
 
 CModulesView::CModulesView(DWORD pid, IMainFrame* frame) : CViewBase(frame), m_Tracker(pid) {
 }
@@ -230,6 +231,8 @@ DWORD CModulesView::OnItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 		lcd->clrTextBk = RGB(0, 255, 0);
 	else if (mi->Type == WinSys::MapType::Image && mi->Base != mi->ImageBase)
 		lcd->clrTextBk = RGB(255, 255, 128);
+
+	lcd->clrText = lcd->clrTextBk == CLR_INVALID ? GetDefaultTextColor() : GetContrastingTextColor(lcd->clrTextBk);
 
 	return CDRF_DODEFAULT;
 }

@@ -200,6 +200,7 @@ BEGIN
         MENUITEM "Run at Logon",                ID_OPTIONS_RUNATLOGON
         MENUITEM "Minimize to Tray",            ID_OPTIONS_MINIMIZETOTRAY
         MENUITEM "&Single Instance Only",       ID_OPTIONS_SINGLEINSTANCEONLY
+        MENUITEM "&Dark Mode",                  ID_OPTIONS_DARKMODE
     END
     POPUP "&Tab"
     BEGIN

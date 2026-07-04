@@ -24,6 +24,7 @@ public:
 	bool AlwaysOnTop{ false };
 	bool SingleInstanceOnly{ false };
 	bool MinimizeToTray{ false };
+	bool DarkMode{ false };
 
 	struct {
 		HighlightColor Colors[(int)ProcessColorIndex::COUNT] {

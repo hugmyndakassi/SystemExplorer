@@ -8,6 +8,7 @@
 #include "ClipboardHelper.h"
 #include "ObjectsSummaryView.h"
 #include "SortHelper.h"
+#include "ListViewColorHelper.h"
 
 BOOL CObjectSummaryView::PreTranslateMessage(MSG* pMsg) {
 	return FALSE;
@@ -38,6 +39,7 @@ DWORD CObjectSummaryView::OnSubItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 	auto lcd = (LPNMLVCUSTOMDRAW)cd;
 	auto sub = lcd->iSubItem;
 	lcd->clrTextBk = CLR_INVALID;
+	lcd->clrText = GetDefaultTextColor();
 	if (sub == 0) {
 		return CDRF_DODEFAULT;
 	}
@@ -53,7 +55,6 @@ DWORD CObjectSummaryView::OnSubItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 	auto index = (int)cd->dwItemSpec;
 	auto item = GetItem(index);
 	auto& changes = m_ObjectManager.GetChanges();
-	lcd->clrText = CLR_INVALID;
 
 	for (auto& change : changes) {
 		if (std::get<0>(change) == item && MapChangeToColumn(std::get<1>(change)) == sub) {

@@ -3,6 +3,7 @@
 #include "resource.h"
 #include "MainFrm.h"
 #include "DriverHelper.h"
+#include <WTLHelper.h>
 
 CAppModule _Module;
 
@@ -57,6 +58,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lps
 
 	hRes = _Module.Init(nullptr, hInstance);
 	ATLASSERT(SUCCEEDED(hRes));
+
+	CMainFrame::LoadSettings();
+	WTLHelper::InitDarkMode(Settings::Get().DarkMode ? DarkModeKind::Dark : DarkModeKind::Light);
 
 	int nRet = Run(lpstrCmdLine, nCmdShow);
 

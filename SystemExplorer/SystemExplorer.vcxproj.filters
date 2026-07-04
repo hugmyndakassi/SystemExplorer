@@ -494,6 +494,9 @@
     <ClInclude Include="InstallServiceDlg.h">
       <Filter>Dialogs</Filter>
     </ClInclude>
+    <ClInclude Include="ListViewColorHelper.h">
+      <Filter>Helpers</Filter>
+    </ClInclude>
     <ClInclude Include="ListViewHelper.h">
       <Filter>Helpers</Filter>
     </ClInclude>

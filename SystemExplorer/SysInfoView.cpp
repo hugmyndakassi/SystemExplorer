@@ -2,6 +2,7 @@
 #include "SysInfoView.h"
 #include "FormatHelper.h"
 #include "SortHelper.h"
+#include "ListViewColorHelper.h"
 
 using namespace WinSys;
 
@@ -102,6 +103,7 @@ DWORD CSysInfoView::OnItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 	auto lv = (NMLVCUSTOMDRAW*)cd;
 
 	lv->clrTextBk = CLR_INVALID;
+	lv->clrText = GetDefaultTextColor();
 	auto row = (int)lv->nmcd.dwItemSpec;
 	auto& item = m_Items[row];
 	if ((item.Flags & ItemDataFlags::Const) == ItemDataFlags::Const)
@@ -119,6 +121,8 @@ DWORD CSysInfoView::OnItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 		else if (*item.Current.Value64 < *item.Previous.Value64)
 			lv->clrTextBk = RGB(255, 64, 0);
 	}
+	if (lv->clrTextBk != CLR_INVALID)
+		lv->clrText = GetContrastingTextColor(lv->clrTextBk);
 	return CDRF_DODEFAULT;
 }
 

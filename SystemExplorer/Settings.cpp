@@ -67,6 +67,7 @@ bool Settings::Save(PCWSTR filename) const {
 	file.WriteBool(L"Options", L"AlwaysOnTop", AlwaysOnTop);
 	file.WriteBool(L"Options", L"SingleInstance", SingleInstanceOnly);
 	file.WriteBool(L"Options", L"MinimizeToTray", MinimizeToTray);
+	file.WriteBool(L"Options", L"DarkMode", DarkMode);
 	file.WriteInt(L"ProcessOptions", L"Interval", Processes.UpdateInterval);
 	
 	return SaveColors(filename, L"ProcessColors", Processes.Colors, _countof(Processes.Colors));
@@ -80,6 +81,7 @@ bool Settings::Load(PCWSTR filename) {
 	AlwaysOnTop = file.ReadBool(L"Options", L"AlwaysOnTop");
 	SingleInstanceOnly = file.ReadBool(L"Options", L"SingleInstance");
 	MinimizeToTray = file.ReadBool(L"Options", L"MinimizeToTray");
+	DarkMode = file.ReadBool(L"Options", L"DarkMode");
 	Processes.UpdateInterval = file.ReadInt(L"ProcessOptions", L"Interval", Processes.UpdateInterval);
 
 	return LoadColors(filename, L"ProcessColors", Processes.Colors, _countof(Processes.Colors));

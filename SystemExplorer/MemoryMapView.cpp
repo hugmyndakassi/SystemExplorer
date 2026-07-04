@@ -7,6 +7,7 @@
 #include <Psapi.h>
 #include "ntdll.h"
 #include <Helpers.h>
+#include "ListViewColorHelper.h"
 
 CMemoryMapView::CMemoryMapView(IMainFrame* frame, DWORD pid) : CViewBase(frame), m_Pid(pid) {
 }
@@ -68,6 +69,7 @@ DWORD CMemoryMapView::OnSubItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 	auto& item = m_Items[index];
 
 	lcd->clrTextBk = UsageToBackColor(*item);
+	lcd->clrText = lcd->clrTextBk == CLR_INVALID ? GetDefaultTextColor() : GetContrastingTextColor(lcd->clrTextBk);
 
 	return CDRF_DODEFAULT;
 }

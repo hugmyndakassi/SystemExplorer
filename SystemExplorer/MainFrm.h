@@ -7,9 +7,9 @@
 #include "ObjectManager.h"
 #include "Interfaces.h"
 #include "ToolBarHelper.h"
-#include "Settings.h"
 #include "NotifyIcon.h"
 #include <unordered_set>
+#include <NativeCustomTabView.h>
 
 class CMainFrame : 
 	public CFrameWindowImpl<CMainFrame>, 
@@ -27,10 +27,9 @@ public:
 	BOOL OnIdle() override;
 	void OnFinalMessage(HWND) override;
 	void SaveSettings(PCWSTR filename = nullptr);
-	void LoadSettings(PCWSTR filename = nullptr);
+	static void LoadSettings(PCWSTR filename = nullptr);
+	static CString GetDefaultSettingsFile();
 	void OnTrayIconSelected();
-
-	CCommandBarCtrl m_CmdBar;
 
 	// Inherited via IMainFrame
 	BOOL TrackPopupMenu(HMENU hMenu, HWND hWnd, POINT*, UINT) override;
@@ -102,6 +101,8 @@ public:
 		COMMAND_ID_HANDLER(ID_OPTIONS_REPLACETASKMANAGER, OnReplaceTaskManager)
 		COMMAND_ID_HANDLER(ID_OPTIONS_SINGLEINSTANCEONLY, OnSingleInstance)
 		COMMAND_ID_HANDLER(ID_OPTIONS_MINIMIZETOTRAY, OnMinimizeToTray)
+		COMMAND_ID_HANDLER(ID_OPTIONS_DARKMODE, OnToggleDarkMode)
+		MESSAGE_HANDLER(WM_UPDATE_DARKMODE, OnUpdateDarkMode)
 
 		COMMAND_ID_HANDLER(ID_GUI_ALLWINDOWSINDEFAULTDESKTOP, OnShowAllWindowsDefaultDesktop)
 		COMMAND_RANGE_HANDLER(ID_WINDOW_TABFIRST, ID_WINDOW_TABLAST, OnWindowActivate)
@@ -175,6 +176,8 @@ private:
 	LRESULT OnReplaceTaskManager(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnSingleInstance(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnMinimizeToTray(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnToggleDarkMode(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnUpdateDarkMode(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 	LRESULT OnViewSystemInformation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnViewDrivers(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnFindReplaceMessage(UINT /*uMsg*/, WPARAM id, LPARAM lParam, BOOL& handled);
@@ -184,17 +187,16 @@ private:
 	LRESULT OnViewProcessTree(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 
 private:
-	CString GetDefaultSettingsFile();
 	void ToggleAlwaysOnTop(UINT id);
 	void CloseAllBut(int page);
-	void InitCommandBar();
+	void InitMenu(HMENU hMenu);
 	void InitToolBar(CToolBarCtrl& tb);
 	bool DetachTab(int index);
 	LRESULT SendMessageToAllFrames(bool excludeCurrent, UINT msg, WPARAM wParam = 0, LPARAM lParam = 0);
 	LRESULT ShowNotImplemented();
 
 private:
-	CTabView m_view;
+	CNativeCustomTabView m_view;
 	CMultiPaneStatusBarCtrl m_StatusBar;
 	inline static ObjectManager m_ObjMgr;
 	int m_CurrentPage = -1;

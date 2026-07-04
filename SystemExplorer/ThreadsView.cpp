@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "FormatHelper.h"
 #include "SelectColumnsDlg.h"
+#include "ListViewColorHelper.h"
 
 CThreadsView::CThreadsView(IMainFrame* frame, DWORD pid) : CViewBase(frame), m_Pid(pid) {
 }
@@ -165,6 +166,8 @@ DWORD CThreadsView::OnSubItemPrePaint(int, LPNMCUSTOMDRAW cd) {
 			Settings::Get().GetCPUColors(t->CPU / 10000, lcd->clrTextBk, lcd->clrText);
 			break;
 	}
+	if (lcd->clrText == CLR_INVALID)
+		lcd->clrText = lcd->clrTextBk == CLR_INVALID ? GetDefaultTextColor() : GetContrastingTextColor(lcd->clrTextBk);
 	return CDRF_NEWFONT;
 }
 

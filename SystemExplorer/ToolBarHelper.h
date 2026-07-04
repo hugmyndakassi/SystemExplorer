@@ -84,8 +84,7 @@ public:
 				// new items could be added here for example)
 				pT->PrepareToolBarMenu(nMenuID, menuPopup);
 				// Display the menu				
-				// Using command bar TrackPopupMenu method means menu icons are displayed
-				pT->m_CmdBar.TrackPopupMenu(menuPopup, TPM_RIGHTBUTTON | TPM_VERTICAL, pt.x, pt.y);
+				::TrackPopupMenu(menuPopup, TPM_RIGHTBUTTON | TPM_VERTICAL, pt.x, pt.y, 0, pT->m_hWnd, nullptr);
 			}
 		}
 		return 0;

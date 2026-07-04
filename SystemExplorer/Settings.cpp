@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Settings.h"
 #include "IniFile.h"
+#include <WTLHelper.h>
 
 Settings::Settings() {
 }
@@ -15,6 +16,11 @@ void Settings::SetDefaults() {
 }
 
 void Settings::GetCPUColors(int cpu, COLORREF& bk, COLORREF& text) {
+	// The brighter stops in this gradient (orange/yellow/light blue/cyan) are
+	// too glaring against a dark background, so they get muted, darker
+	// equivalents in dark mode; DarkRed/DarkBlue/Black are already dark enough
+	// to leave alone.
+	auto dark = WTLHelper::IsDarkMode();
 	if (cpu > 90) {
 		bk = StandardColors::Black;
 		text = StandardColors::White;
@@ -24,40 +30,40 @@ void Settings::GetCPUColors(int cpu, COLORREF& bk, COLORREF& text) {
 		text = StandardColors::White;
 	}
 	else if (cpu > 70) {
-		bk = StandardColors::DarkOrange;
-		text = StandardColors::Black;
+		bk = dark ? RGB(140, 80, 0) : StandardColors::DarkOrange;
+		text = dark ? StandardColors::White : StandardColors::Black;
 	}
 	else if (cpu > 60) {
-		bk = StandardColors::Orange;
-		text = StandardColors::Black;
+		bk = dark ? RGB(150, 95, 0) : StandardColors::Orange;
+		text = dark ? StandardColors::White : StandardColors::Black;
 	}
 	else if (cpu > 50) {
-		bk = StandardColors::Yellow;
-		text = StandardColors::Black;
+		bk = dark ? RGB(120, 120, 0) : StandardColors::Yellow;
+		text = dark ? StandardColors::White : StandardColors::Black;
 	}
 	else if (cpu > 40) {
 		bk = StandardColors::DarkBlue;
 		text = StandardColors::White;
 	}
 	else if (cpu > 30) {
-		bk = StandardColors::Blue;
+		bk = dark ? RGB(0, 0, 140) : StandardColors::Blue;
 		text = StandardColors::White;
 	}
 	else if (cpu > 20) {
-		bk = StandardColors::LightBlue;
-		text = StandardColors::Black;
+		bk = dark ? RGB(50, 80, 100) : StandardColors::LightBlue;
+		text = dark ? StandardColors::White : StandardColors::Black;
 	}
 	else if (cpu > 15) {
-		bk = StandardColors::Cyan;
-		text = StandardColors::Black;
+		bk = dark ? RGB(0, 110, 110) : StandardColors::Cyan;
+		text = dark ? StandardColors::White : StandardColors::Black;
 	}
 	else if (cpu > 10) {
-		bk = StandardColors::LightCyan;
-		text = StandardColors::Black;
+		bk = dark ? RGB(60, 110, 110) : StandardColors::LightCyan;
+		text = dark ? StandardColors::White : StandardColors::Black;
 	}
 	else if (cpu > 5) {
-		bk = StandardColors::LimeGreen;
-		text = StandardColors::Black;
+		bk = dark ? RGB(20, 90, 20) : StandardColors::LimeGreen;
+		text = dark ? StandardColors::White : StandardColors::Black;
 	}
 }
 

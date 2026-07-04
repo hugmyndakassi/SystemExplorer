@@ -259,3 +259,7 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+/KObjExp/RCa72448
+/KObjExp/RCb72448
+/KObjExp/RCc72448
+/KObjExp/RCd72448

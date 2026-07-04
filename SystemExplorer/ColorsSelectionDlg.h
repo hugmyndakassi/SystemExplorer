@@ -3,9 +3,8 @@
 #include "resource.h"
 #include "ProcessColor.h"
 
-class CColorsSelectionDlg : 
-	public CDialogImpl<CColorsSelectionDlg>,
-	public CCustomDraw<CColorsSelectionDlg> {
+class CColorsSelectionDlg :
+	public CDialogImpl<CColorsSelectionDlg> {
 public:
 	enum { IDD = IDD_COLORS };
 
@@ -14,12 +13,9 @@ public:
 
 	const HighlightColor* GetColors() const;
 
-	DWORD OnPrePaint(int /*idCtrl*/, LPNMCUSTOMDRAW /*lpNMCustomDraw*/);
-	DWORD OnPreErase(int /*idCtrl*/, LPNMCUSTOMDRAW /*lpNMCustomDraw*/);
-	DWORD OnPostErase(int /*idCtrl*/, LPNMCUSTOMDRAW /*lpNMCustomDraw*/);
-
-	BEGIN_MSG_MAP(CAboutDlg)
+	BEGIN_MSG_MAP(CColorsSelectionDlg)
 		MESSAGE_HANDLER(WM_INITDIALOG, OnInitDialog)
+		MESSAGE_HANDLER(WM_DRAWITEM, OnDrawItem)
 		COMMAND_ID_HANDLER(IDOK, OnCloseCmd)
 		COMMAND_ID_HANDLER(IDCANCEL, OnCloseCmd)
 		COMMAND_ID_HANDLER(ID_COLOR_BACKGROUND, OnChangeBackground)
@@ -30,7 +26,7 @@ public:
 		COMMAND_ID_HANDLER(IDC_LOAD, OnLoad)
 		NOTIFY_CODE_HANDLER(BCN_DROPDOWN, OnChangeDropdown)
 		COMMAND_RANGE_HANDLER(IDC_CHANGE, IDC_CHANGE + m_CountColors, OnChangeColor)
-		CHAIN_MSG_MAP(CCustomDraw<CColorsSelectionDlg>)
+		COMMAND_RANGE_HANDLER(IDC_ENABLED, IDC_ENABLED + m_CountColors, OnToggleEnabled)
 	END_MSG_MAP()
 
 	// Handler prototypes (uncomment arguments if needed):
@@ -43,7 +39,9 @@ private:
 	void DoChangeColors(HWND button);
 
 	LRESULT OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	LRESULT OnDrawItem(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 	LRESULT OnButtonColor(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	LRESULT OnToggleEnabled(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnCloseCmd(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnChangeColor(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnChangeDropdown(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);

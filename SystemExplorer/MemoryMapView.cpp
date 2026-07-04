@@ -2,7 +2,6 @@
 #include "MemoryMapView.h"
 #include "DriverHelper.h"
 #include "resource.h"
-#include "SortHelper.h"
 #include <algorithm>
 #include <Psapi.h>
 #include "ntdll.h"
@@ -12,70 +11,8 @@
 CMemoryMapView::CMemoryMapView(IMainFrame* frame, DWORD pid) : CViewBase(frame), m_Pid(pid) {
 }
 
-CString CMemoryMapView::GetColumnText(HWND h, int row, int column) const {
-	auto& item = *m_Items[row];
-	CString text;
-
-	switch (column) {
-		case 0: return StateToString(item.State);
-		case 1: text.Format(L"0x%0p", item.BaseAddress); break;
-		case 2: return FormatWithCommas(item.RegionSize >> 10) + L" KB";
-		case 3: return item.State != MEM_COMMIT ? L"" : TypeToString(item.Type);
-		case 4: return item.State != MEM_COMMIT ? CString() : ProtectionToString(item.Protect);
-		case 5: return item.State == MEM_FREE ? CString() : ProtectionToString(item.AllocationProtect);
-		case 6: return UsageToString(item);
-		case 7: return GetDetails(item).Details;
-	}
-	return text;
-}
-
-int CMemoryMapView::GetRowImage(HWND, int row) const {
-	switch (m_Items[row]->State) {
-		case MEM_COMMIT: return 2;
-		case MEM_RESERVE: return 1;
-	}
-	return 0;
-}
-
-int CMemoryMapView::GetRowIndent(int row) const {
-	auto& item = *m_Items[row];
-	return item.State == MEM_FREE || item.AllocationBase == item.BaseAddress ? 0 : 1;
-}
-
-void CMemoryMapView::DoSort(const SortInfo* si) {
-	if (si == nullptr)
-		return;
-
-	std::sort(m_Items.begin(), m_Items.end(), [=](auto& i1, auto& i2) {
-		return CompareItems(*i1, *i2, si->SortColumn, si->SortAscending);
-		});
-}
-
 bool CMemoryMapView::IsUpdating() const {
 	return false;
-}
-
-DWORD CMemoryMapView::OnPrePaint(int, LPNMCUSTOMDRAW cd) {
-	if (cd->hdr.hwndFrom != m_List)
-		return CDRF_DODEFAULT;
-	return CDRF_NOTIFYITEMDRAW;
-}
-
-DWORD CMemoryMapView::OnSubItemPrePaint(int, LPNMCUSTOMDRAW cd) {
-	auto lcd = (LPNMLVCUSTOMDRAW)cd;
-	auto sub = lcd->iSubItem;
-	lcd->clrTextBk = CLR_INVALID;
-	int index = (int)cd->dwItemSpec;
-	auto& item = m_Items[index];
-
-	lcd->clrTextBk = UsageToBackColor(*item);
-	lcd->clrText = lcd->clrTextBk == CLR_INVALID ? GetDefaultTextColor() : GetContrastingTextColor(lcd->clrTextBk);
-
-	return CDRF_DODEFAULT;
-}
-
-DWORD CMemoryMapView::OnItemPrePaint(int, LPNMCUSTOMDRAW) {
-	return CDRF_NOTIFYITEMDRAW;
 }
 
 LRESULT CMemoryMapView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
@@ -89,24 +26,24 @@ LRESULT CMemoryMapView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 
 	m_hReadProcess.reset(DriverHelper::OpenProcess(m_Pid, PROCESS_VM_READ));
 
-	m_hWndClient = m_List.Create(*this, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | LVS_SINGLESEL | LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS);
-	m_List.SetExtendedListViewStyle(LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
+	m_hWndClient = m_Tree.Create(*this, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS |
+		TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS);
 
-	m_List.InsertColumn(0, L"State", 0, 110);
-	m_List.InsertColumn(1, L"Address", LVCFMT_RIGHT, 140);
-	m_List.InsertColumn(2, L"Size", LVCFMT_RIGHT, 120);
-	m_List.InsertColumn(3, L"Type", LVCFMT_LEFT, 70);
-	m_List.InsertColumn(4, L"Protection", 0, 140);
-	m_List.InsertColumn(5, L"Alloc Protection", 0, 140);
-	m_List.InsertColumn(6, L"Usage", 0, 90);
-	m_List.InsertColumn(7, L"Details", 0, 500);
+	m_Tree.AddColumn(L"State", 200);
+	m_Tree.AddColumn(L"Address", 140, HDF_RIGHT);
+	m_Tree.AddColumn(L"Size", 120, HDF_RIGHT);
+	m_Tree.AddColumn(L"Type", 70);
+	m_Tree.AddColumn(L"Protection", 140);
+	m_Tree.AddColumn(L"Alloc Protection", 140);
+	m_Tree.AddColumn(L"Usage", 90);
+	m_Tree.AddColumn(L"Details", 500);
 
 	CImageList images;
 	images.Create(16, 16, ILC_COLOR32, 4, 0);
 	UINT icons[] = { IDI_FREE, IDI_RESERVED, IDI_COMMIT };
 	for (auto icon : icons)
 		images.AddIcon(AtlLoadIconImage(icon, 0, 16, 16));
-	m_List.SetImageList(images, LVSIL_SMALL);
+	m_Tree.GetTreeControl().SetImageList(images, TVSIL_NORMAL);
 
 	Refresh();
 
@@ -117,6 +54,22 @@ LRESULT CMemoryMapView::OnRefresh(WORD, WORD, HWND, BOOL&) {
 	CWaitCursor wait;
 	Refresh();
 
+	return 0;
+}
+
+LRESULT CMemoryMapView::OnDarkModeChanged(UINT, WPARAM, LPARAM, BOOL& bHandled) {
+	// The tree/header's own base colors are re-applied by CTreeListViewImpl
+	// itself (it listens for WTLHelper::ThemeChangedMessage, broadcast by
+	// WTLHelper::SwitchToMode to every descendant, including m_Tree). What's
+	// left is our own per-item highlight colors (UsageToBackColor), which are
+	// absolute RGB values baked in whenever each item was last colored, so
+	// they need to be explicitly recomputed here - cheaply, in place, without
+	// rebuilding the tree.
+	for (size_t i = 0; i < m_Items.size() && i < m_ItemHandles.size(); i++)
+		ApplyItemColors(m_ItemHandles[i], *m_Items[i]);
+	m_Tree.GetTreeControl().Invalidate();
+
+	bHandled = FALSE;
 	return 0;
 }
 
@@ -157,9 +110,53 @@ void CMemoryMapView::Refresh() {
 		GetDetails(*mi);
 	}
 
-	DoSort(GetSortInfo(m_List));
+	auto tree = m_Tree.GetTreeControl();
+	tree.SetRedraw(FALSE);
+	tree.DeleteAllItems();
 
-	m_List.SetItemCountEx(static_cast<int>(m_Items.size()), LVSICF_NOSCROLL | LVSICF_NOINVALIDATEALL);
+	m_ItemHandles.clear();
+	m_ItemHandles.reserve(m_Items.size());
+
+	HTREEITEM hTop = TVI_ROOT;
+	for (auto& item : m_Items) {
+		bool isTopLevel = item->State == MEM_FREE || item->AllocationBase == item->BaseAddress;
+		auto hItem = AddItem(isTopLevel ? TVI_ROOT : hTop, *item);
+		m_ItemHandles.push_back(hItem);
+		if (isTopLevel)
+			hTop = hItem;
+	}
+
+	tree.SetRedraw(TRUE);
+	tree.Invalidate();
+}
+
+HTREEITEM CMemoryMapView::AddItem(HTREEITEM hParent, const WinSys::MemoryRegionItem& item) {
+	int image = item.State == MEM_COMMIT ? 2 : (item.State == MEM_RESERVE ? 1 : 0);
+	CString address;
+	address.Format(L"0x%p", item.AllocationBase);
+	auto hItem = m_Tree.GetTreeControl().InsertItem(hParent == TVI_ROOT ? (PCWSTR)address : StateToString(item.State), image, image, hParent, TVI_LAST);
+
+	address.Format(L"0x%0p", item.BaseAddress);
+	m_Tree.SetSubItemText(hItem, 1, address);
+	m_Tree.SetSubItemText(hItem, 2, FormatWithCommas(item.RegionSize >> 10) + L" KB");
+	m_Tree.SetSubItemText(hItem, 3, item.State != MEM_COMMIT ? L"" : TypeToString(item.Type));
+	m_Tree.SetSubItemText(hItem, 4, item.State != MEM_COMMIT ? CString() : ProtectionToString(item.Protect));
+	m_Tree.SetSubItemText(hItem, 5, item.State == MEM_FREE ? CString() : ProtectionToString(item.AllocationProtect));
+	m_Tree.SetSubItemText(hItem, 6, UsageToString(item));
+	m_Tree.SetSubItemText(hItem, 7, GetDetails(item).Details);
+
+	ApplyItemColors(hItem, item);
+
+	return hItem;
+}
+
+void CMemoryMapView::ApplyItemColors(HTREEITEM hItem, const WinSys::MemoryRegionItem& item) {
+	auto back = UsageToBackColor(item);
+	if (back != CLR_INVALID) {
+		auto text = ::GetSysColor(COLOR_WINDOWTEXT);
+		for (int col = 1; col < 8; col++)
+			m_Tree.SetSubItemColor(hItem, col, text, back);
+	}
 }
 
 PCWSTR CMemoryMapView::StateToString(DWORD state) {
@@ -228,30 +225,6 @@ CString CMemoryMapView::HeapFlagsToString(DWORD flags) {
 	return text;
 }
 
-bool CMemoryMapView::CompareItems(WinSys::MemoryRegionItem& m1, WinSys::MemoryRegionItem& m2, int col, bool asc) {
-	switch (col) {
-		case 0: return SortHelper::SortNumbers(m1.State, m2.State, asc);
-		case 1: return SortHelper::SortNumbers(m1.BaseAddress, m2.BaseAddress, asc);
-		case 2: return SortHelper::SortNumbers(m1.RegionSize, m2.RegionSize, asc);
-		case 3: return SortHelper::SortNumbers(m1.Type, m2.Type, asc);
-		case 4:
-			if (m1.State != MEM_COMMIT)
-				return false;
-			if (m2.State != MEM_COMMIT)
-				return true;
-			return SortHelper::SortNumbers(m1.Protect, m2.Protect, asc);
-		case 5:
-			if (m1.State == MEM_FREE)
-				return false;
-			if (m2.State == MEM_FREE)
-				return true;
-			return SortHelper::SortNumbers(m1.AllocationProtect, m2.AllocationProtect, asc);
-		case 6: return SortHelper::SortNumbers(GetDetails(m1).Usage, GetDetails(m2).Usage, asc);
-		case 7: return SortHelper::SortStrings(GetDetails(m1).Details, GetDetails(m2).Details, asc);
-	}
-	return false;
-}
-
 PCWSTR CMemoryMapView::UsageToString(const WinSys::MemoryRegionItem& item) const {
 	auto it = m_Details.find(item.AllocationBase ? item.AllocationBase : item.BaseAddress);
 	MemoryUsage usage;
@@ -272,16 +245,17 @@ PCWSTR CMemoryMapView::UsageToString(const WinSys::MemoryRegionItem& item) const
 }
 
 COLORREF CMemoryMapView::UsageToBackColor(const WinSys::MemoryRegionItem& item) const {
+	auto dark = WTLHelper::IsDarkMode();
 	switch (GetDetails(item).Usage) {
-		case MemoryUsage::PrivateData: return RGB(255, 255, 0);
-		case MemoryUsage::ThreadStack: return RGB(0, 255, 128);
-		case MemoryUsage::Image: return RGB(255, 128, 128);
-		case MemoryUsage::Mapped: return RGB(128, 255, 255);
-		case MemoryUsage::Unusable: return RGB(192, 192, 192);
-		case MemoryUsage::Heap: return RGB(192, 128, 192);
+		case MemoryUsage::PrivateData: return dark ? RGB(110, 110, 0) : RGB(255, 255, 0);
+		case MemoryUsage::ThreadStack: return dark ? RGB(0, 110, 60) : RGB(0, 255, 128);
+		case MemoryUsage::Image: return dark ? RGB(140, 70, 70) : RGB(255, 128, 128);
+		case MemoryUsage::Mapped: return dark ? RGB(60, 120, 130) : RGB(128, 255, 255);
+		case MemoryUsage::Unusable: return dark ? RGB(90, 90, 90) : RGB(192, 192, 192);
+		case MemoryUsage::Heap: return dark ? RGB(100, 65, 100) : RGB(192, 128, 192);
 	}
 	if(item.State != MEM_FREE)
-		return RGB(255, 255, 0);
+		return dark ? RGB(110, 110, 0) : RGB(255, 255, 0);
 	return CLR_INVALID;
 }
 
@@ -337,7 +311,7 @@ CMemoryMapView::ItemDetails CMemoryMapView::GetDetails(const WinSys::MemoryRegio
 		for (auto& heap : m_Heaps) {
 			if (mi.AllocationBase <= (PVOID)heap.Address && mi.AllocationBase != nullptr && (BYTE*)mi.AllocationBase + mi.RegionSize > (PVOID)heap.Address) {
 				details.Usage = MemoryUsage::Heap;
-				details.Details.Format(L"Heap %u %s", heap.Id, HeapFlagsToString(heap.Flags));
+				details.Details.Format(L"Heap %u %s", heap.Id, (PCWSTR)HeapFlagsToString(heap.Flags));
 				break;
 			}
 		}

@@ -13,30 +13,44 @@ const HighlightColor* CColorsSelectionDlg::GetColors() const {
     return m_Colors.data();
 }
 
-DWORD CColorsSelectionDlg::OnPrePaint(int, LPNMCUSTOMDRAW) {
-    return CDRF_NOTIFYITEMDRAW;
-}
-
-DWORD CColorsSelectionDlg::OnPreErase(int, LPNMCUSTOMDRAW cd) {
-    auto id = (UINT)cd->hdr.idFrom;
-    if (id >= IDC_ENABLED && id < IDC_ENABLED + m_CountColors) {
-        UINT i = id - IDC_ENABLED;
-        CDCHandle dc(cd->hdc);
-        CRect rc(cd->rc);
-        rc.InflateRect(-20, 10, -10, 10);
-        dc.FillSolidRect(&rc, m_Colors[i].Color);
-        dc.SetTextColor(m_Colors[i].TextColor);
-        dc.SetBkMode(TRANSPARENT);
-        dc.DrawText(m_Colors[i].Name, -1, &rc, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+// These "checkboxes" are entirely custom-painted color swatches (background =
+// the highlight color, label = its name). NM_CUSTOMDRAW erase-stage
+// notifications for plain (non-push-like) BS_AUTOCHECKBOX buttons turned out
+// to be unreliable - not just under dark mode, but in general - so painting
+// is done the guaranteed-reliable way: BS_OWNERDRAW + WM_DRAWITEM. That means
+// we also draw the checkbox glyph itself and manage its checked state
+// ourselves (see OnToggleEnabled) instead of relying on BM_GETCHECK/SETCHECK.
+LRESULT CColorsSelectionDlg::OnDrawItem(UINT, WPARAM, LPARAM lParam, BOOL& bHandled) {
+    auto dis = (LPDRAWITEMSTRUCT)lParam;
+    auto id = dis->CtlID;
+    if (id < IDC_ENABLED || id >= IDC_ENABLED + m_CountColors) {
+        bHandled = FALSE;
+        return 0;
     }
 
-    return CDRF_SKIPPOSTPAINT;
-}
+    UINT i = id - IDC_ENABLED;
+    CDCHandle dc(dis->hDC);
+    CRect rcItem(dis->rcItem);
 
-DWORD CColorsSelectionDlg::OnPostErase(int, LPNMCUSTOMDRAW cd) {
-    ::SetTextColor(cd->hdc, RGB(255, 255, 255));
+    dc.FillSolidRect(&rcItem, ::GetSysColor(COLOR_BTNFACE));
 
-    return CDRF_SKIPPOSTPAINT;
+    CRect rcCheck(rcItem.left, rcItem.CenterPoint().y - 8, rcItem.left + 16, rcItem.CenterPoint().y + 8);
+    UINT state = DFCS_BUTTONCHECK;
+    if (m_Colors[i].Enabled)
+        state |= DFCS_CHECKED;
+    dc.DrawFrameControl(&rcCheck, DFC_BUTTON, state);
+
+    CRect rc(rcItem);
+    rc.InflateRect(-20, 10, -10, 10);
+    dc.FillSolidRect(&rc, m_Colors[i].Color);
+    dc.SetTextColor(m_Colors[i].TextColor);
+    dc.SetBkMode(TRANSPARENT);
+    dc.DrawText(m_Colors[i].Name, -1, &rc, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+
+    if (dis->itemState & ODS_FOCUS)
+        dc.DrawFocusRect(&rcItem);
+
+    return TRUE;
 }
 
 COLORREF CColorsSelectionDlg::SelectColor(COLORREF initial) {
@@ -56,7 +70,7 @@ LRESULT CColorsSelectionDlg::OnInitDialog(UINT, WPARAM, LPARAM, BOOL&) {
     CRect rc;
     cbMain.GetWindowRect(&rc);
     ScreenToClient(&rc);
-    auto cbStyle = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_CLIPSIBLINGS | BS_CENTER | BS_VCENTER;
+    auto cbStyle = WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_CLIPSIBLINGS | WS_TABSTOP;
     cbMain.DestroyWindow();
 
     CButton changeButton(GetDlgItem(IDC_CHANGE));
@@ -66,11 +80,9 @@ LRESULT CColorsSelectionDlg::OnInitDialog(UINT, WPARAM, LPARAM, BOOL&) {
     changeButton.DestroyWindow();
 
     for (UINT i = 0; i < m_CountColors; i++) {
-        auto color = m_Colors.begin() + i;
         CButton cb;
         cb.Create(*this, &rc, L"", cbStyle, 0, IDC_ENABLED + i);
         cb.SetFont(GetFont());
-        cb.SetCheck(color->Enabled ? BST_CHECKED : BST_UNCHECKED);
         rc.OffsetRect(0, rc.Height() + 12);
 
         CButton split;
@@ -86,11 +98,16 @@ LRESULT CColorsSelectionDlg::OnButtonColor(UINT, WPARAM, LPARAM, BOOL&) {
 }
 
 LRESULT CColorsSelectionDlg::OnCloseCmd(WORD, WORD wID, HWND, BOOL&) {
-    if (wID == IDOK) {
-        for (UINT i = 0; i < m_CountColors; i++)
-            m_Colors[i].Enabled = IsDlgButtonChecked(IDC_ENABLED + i);
-    }
+    // m_Colors[i].Enabled is kept live-updated by OnToggleEnabled (matching how
+    // color changes are already applied immediately, with no cancel/rollback).
     EndDialog(wID);
+    return 0;
+}
+
+LRESULT CColorsSelectionDlg::OnToggleEnabled(WORD, WORD wID, HWND hWndCtl, BOOL&) {
+    UINT i = wID - IDC_ENABLED;
+    m_Colors[i].Enabled = !m_Colors[i].Enabled;
+    ::InvalidateRect(hWndCtl, nullptr, TRUE);
     return 0;
 }
 

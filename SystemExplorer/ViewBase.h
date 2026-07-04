@@ -24,6 +24,14 @@ namespace ViewBaseHelper {
 			TreeView_SetTextColor(hWnd, text);
 			::InvalidateRect(hWnd, nullptr, TRUE);
 		}
+		else if (_wcsicmp(cls, WC_HEADER) == 0) {
+			// Headers embedded in composite controls (e.g. WTLHelper's TreeListView)
+			// aren't reached by WTLHelper's own automatic per-control theming, which
+			// only recognizes direct children of a known class (list/tree view etc.)
+			// and doesn't descend into unrecognized composite containers.
+			WTLHelper::ApplyHeaderTheme(hWnd);
+			::InvalidateRect(hWnd, nullptr, TRUE);
+		}
 		return TRUE;
 	}
 
